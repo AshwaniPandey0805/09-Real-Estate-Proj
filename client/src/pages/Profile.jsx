@@ -1,15 +1,19 @@
 import { useSelector } from "react-redux"
 import { useEffect, useRef, useState } from "react"
-import { getStorage, ref, uploadBytesResumable } from "firebase/storage"
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage"
 import { app } from "../firebase.js"
  
 function Profile() {
     const { currentUser } = useSelector((state) => state.user)
-    const [file, setFile] = useState(null)
-    console.log(file);
+    const [file, setFile] = useState(undefined)
+    // console.log(file);
     const fileRef = useRef()
     const [filePerc, setFilePerc] = useState(0);
+    const [fileUploadeError, setFileUploadeError] = useState(false);
+    const [formData, setFormData] = useState({})
     console.log(filePerc);
+    console.log(formData);
+    console.log(fileUploadeError)
     
     useEffect(() => {
         if(file){
@@ -17,22 +21,37 @@ function Profile() {
         }
     },[file]);
 
-    const handleFileUpload = async (file) => {
+    const handleFileUpload = (file) => {
         const storage = getStorage(app);
         const fileName = new Date().getTime() + file.name;
         const storageRef = ref(storage, fileName);
-        const upLoadTask = uploadBytesResumable(storageRef, file);
+        const upLoadTask = uploadBytesResumable(storageRef, file); 
         
 
         upLoadTask.on(
-            "state_changed",
+            'state_changed',
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                 setFilePerc( Math.round(progress));
+            }
+            ,
+            (error) => {
+                setFileUploadeError(true);
             },
-        )
+            () => {
+                getDownloadURL(upLoadTask.snapshot.ref).then((downloadURL) => {
+                    setFormData({
+                        ...formData,
+                        avatar : downloadURL
+                    })
+                });
+            }
+            
+            );
+
+           
         
-    }
+    };
 
 
     return (
@@ -43,13 +62,33 @@ function Profile() {
                     onChange={(e) => setFile(e.target.files[0])}
                     type="file" 
                     ref={fileRef}  
-                    hidden accept="image/*" />
+                    hidden 
+                    accept="image/*" />
 
                 <img 
                     onClick={() => fileRef.current.click()}
-                    src={currentUser.avatar} 
-                    alt="avatar" 
+                    src={formData.avatar || currentUser.avatar} 
+                    alt="profile" 
                     className="w-32 h-32 rounded-full self-center cursor-pointer mt-4 object-cover" />
+                
+                <p className="text-center">
+                    {
+                        fileUploadeError ? (
+                            <span className="text-red-700 font-medium"> Something went wrong</span>
+                        ) : filePerc > 0 && filePerc < 100 ? (
+
+                            <span className="text-slate-600 font-medium text-center">{`Uploading : ${filePerc}`}</span>
+
+                        ) : filePerc == 100 ? (
+
+                            <span className="text-green-700 font-medium text-center" >Image Successfully Uploaded</span>
+
+                        ) : (
+
+                            ""
+                        )
+                    }
+                </p>
                 
                 <input 
                     type="text" 
